@@ -1,0 +1,301 @@
+---
+title: "Christian Rivera Project 4 Udacity"
+author: "Christian Rivera"
+date: "May 16, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(knitr)
+library(dplyr)
+library(memisc)
+library(gridExtra) # for grid.arrange(function)
+library(GGally) # for ggpairs
+library(rpart)  # for the decision trees
+
+```
+
+# White Wine Dataset
+## Introduction
+For My Udacity Project 4 assignment, I chose to analyze the white wine dataset.  This dataset consisted of 4898 samples with 12 values each.  The analysis was meant to determine what, if any traits or traits determined the rated quality of a bottle of white wine.  Using R, I extracted, cleaned and, tested with linear models, polinomial models, and decision trees.  From my analysis, I concluded that, besides a moderate impact from how much alcohol the wine contains, that there is no correlation between the rated quality of a wine and its chemical characteristics.
+
+## Data Analysis
+
+Extracting the white wine data from a csv and running a summary on the data revealed the following statistics:
+
+```{r echo=FALSE}
+
+
+wine <- read.csv("wineQualityWhites.csv")
+wine <-within(wine, rm(X))  # the 'X' column adds nothing and clutters the ggpair output
+summary(wine)
+
+```
+
+As The R output shows, There are the wines in this list have 11 characteristics and a 0-10 quality score.  The characteristics are as follows:
+
+* 1. Fixed Acidity
+* 2. Volatile Acidity
+* 3. Citric Acid
+* 4. Residual Sugar
+* 5. Chlorides
+* 6. Free Sulfur Dioxide
+* 7. Total Sulfur Dioxide
+* 8. Density
+* 9. pH Level
+* 10. Sulfates
+* 11. Alcohol
+
+Checking the distribution of quality scores revealed the following information:
+
+```{r pressure, echo=FALSE}
+qplot(x = quality, data = wine, binwidth = 0.5)  # histogram of quality score range
+```
+
+
+While this bargraph shows a normal distribution of the scoring of white wine, the extreme consolidation towards the average values (5,6,7); that no wines scored below a 3; that there are no perfect 10 wines; and that there are only 5 (0.1%) wines labled as 9's suggests that there is no real consensus as what makes a good quality wine which is why the plurality of wines (44.7%) are 6's and 92.4% of wines fall in the average range between 5-7. 
+
+The following bar graphs for the wine characteristics are shown below:
+
+
+```{r fire, echo=FALSE, fig.height = 10, fig.width = 10}
+#histograms of the other characteristics
+t1 <- qplot(x = fixed.acidity, data = wine, binwidth = 0.1)
+t2 <- qplot(x = volatile.acidity, data = wine, binwidth = 0.01)
+t3 <- qplot(x = citric.acid, data = wine, binwidth = 0.05)
+t4 <- qplot(x = residual.sugar, data = wine, binwidth = 0.1)
+t5 <- qplot(x = chlorides, data = wine, binwidth = 0.005)
+t6 <- qplot(x = free.sulfur.dioxide, data = wine, binwidth = 1)
+t7 <- qplot(x = total.sulfur.dioxide, data = wine, binwidth = 1)
+t8 <- qplot(x = density, data = wine , binwidth = 0.0002)
+t9 <- qplot(x = pH, data = wine, binwidth = 0.05)
+t10 <-qplot(x = sulphates, data = wine, binwidth = 0.05)
+ t11 <- qplot(x = alcohol, data = wine, binwidth = .1)
+grid.arrange(t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11)
+
+```
+Most of the characteristics seems to have a normal distribution.  These include: Fixed Acidity, Citric Acid, Chlorides, Free Sulfur Dioxide, Total Sulfur Dioxide, Density, and pH.
+
+Sulphates and Volatile Acidity seem to have normal distributions with somewhat of a right skew.
+
+Residual Sugar has an extreme right skew and alcohol has an even uniform distribution with a slight right skew.
+
+The next step is to filter out the extremes for each characteristic which shrinks the sample wine size from 4898 to 3880.  The filters and the new univariate bar graphs are shown below.
+
+```{r}
+# the filtered dataframe
+wine1 <- wine 
+wine1 <-  filter(wine1, volatile.acidity <= 0.6 )
+wine1 <- filter(wine1, citric.acid >= 0.2 & citric.acid <= 0.75)
+wine1 <- filter(wine1, residual.sugar <= 20 & residual.sugar >= 0.3)
+wine1 <- filter(wine1, chlorides <= 0.1)
+wine1 <- filter(wine1, free.sulfur.dioxide <=100)
+wine1 <- filter(wine1, total.sulfur.dioxide < 250 & total.sulfur.dioxide > 50)
+wine1 <- filter(wine1, density >= 0.99 & density <=1.01)
+wine1 <- filter(wine1, pH >= 2.85 & pH <= 3.6)
+wine1 <- filter(wine1, sulphates >= 0.3 & sulphates <= 0.85)
+wine1 <- filter(wine1, alcohol >= 8.5 & alcohol <= 13.5)
+
+summary(wine1)
+```
+```{r, echo = FALSE, fig.height = 10, fig.width = 10}
+
+t1 <- qplot(x = fixed.acidity, data = wine1, binwidth = 0.1)
+t2 <- qplot(x = volatile.acidity, data = wine1, binwidth = 0.01)
+t3 <- qplot(x = citric.acid, data = wine1, binwidth = 0.05)
+t4 <- qplot(x = residual.sugar, data = wine1, binwidth = 0.1)
+t5 <- qplot(x = chlorides, data = wine1, binwidth = 0.005)
+t6 <- qplot(x = free.sulfur.dioxide, data = wine1, binwidth = 1)
+t7 <- qplot(x = total.sulfur.dioxide, data = wine1, binwidth = 1)
+t8 <- qplot(x = density, data = wine1 , binwidth = 0.0002)
+t9 <- qplot(x = pH, data = wine1, binwidth = 0.05)
+t10 <-qplot(x = sulphates, data = wine1, binwidth = 0.05)
+ t11 <- qplot(x = alcohol, data = wine1, binwidth = .1)
+grid.arrange(t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11)
+
+
+```
+The filtered characteristics show new behaviors than before they were cleaned.
+
+Of the characteristics that originally had normal distributions, only pH, Free Sulfur Dioxide, Chlorides, and Fixed Acidity remain.
+
+Volatile Acidity, Citric Acid, sulphates, Alcohol, and Density have right skews and Residual Sugar keeps its extreme right skew although its skew has an even distribution.
+
+Interestingly, Total Sulfur Dioxide has a mild bimodal distribution with peaks at 100 and 150 mg/l. 
+
+
+With the data cleaned of outliers, the values are compared against each other using the Pearson Product-Moment Correlation as well as graphed against each other in 2d scatterplots
+
+```{r , echo=FALSE, fig.height = 16, fig.width = 16, warning = FALSE, message=FALSE}
+
+
+ggpairs(wine1)
+
+```
+
+The r^2 correlation values are not promising with only alcohol scoring above a 0.3 (0.386) which suggests a mild correlation but certainly nothing definitive.
+
+
+
+```{r, echo=FALSE, warning = FALSE, message=FALSE}
+
+  ggplot(aes(x = quality, y = alcohol), data = wine1) +
+  geom_point(aes(color = quality), alpha = 0.5, size = 1, position = 'jitter')
+```
+
+I used a jitter scatterplot graph to see if the combination of chlorides (-0.263 correlation to quality) and density (-0.269) as the 2nd and 3rd most correlating characteristics to wine quality would reveal a stronger correlation.
+
+```{r, echo=FALSE}
+
+ggplot(aes(x = chlorides, y = density, color = as.factor(quality)), data = wine1) +
+  geom_jitter(alpha = 0.3) + scale_color_brewer(palette = "Reds")
+```
+
+Unfrotunately this scatterplot graph shows a fairly even and random distribution of scores for the combination of chlorides and density to quality score so those attributes will provide minimal to no assistance in helping to find any correlation to quality score
+
+
+Unfortunately, any attempts to transform the data does not meaningfully increase or decrease the correlation coefficients.  Transforming the data on exponential (squares and squre roots) or logarithmic (log10) does very little to impact the correlation coefficients with changes in correlation accounting for +/- 0.02 changes in the coefficient scores.
+For example:
+```{r}
+with(wine1, cor.test(quality, (alcohol )))
+
+with(wine1, cor.test(quality, log10(alcohol )))
+with(wine1, cor.test(quality, sqrt(alcohol )))
+
+with(wine1, cor.test(quality, (alcohol)^2))
+```
+
+##Linear and Polynomial Regression
+
+With no avenues to transform the data for better correlation coefficients, the next step is to hope that a linear regression might be able to illuminate any relationship in the data.  One of the linear regressions used included the following characteristics: alcohol, sulphates, pH value, free sulfur dioxide, and residual sugar.  The results are shown below
+
+```{r, echo=FALSE}
+
+m1 <- lm(I(quality) ~ I(alcohol), data = wine1)
+m2 <- update(m1, ~ . + (sulphates))
+m3 <- update(m2, ~ . + pH)
+m4 <- update(m3, ~ . + free.sulfur.dioxide)
+m5 <- update(m4, ~ . + residual.sugar)
+
+mtable(m1,m2,m3,m4,m5)
+```
+
+A correlation coefficient $r^{2}$ of 0.2 is would not be considered high enough to be a good fit and unfortunately none of the linear reression combinations I tried could beat beat it.
+
+The next step was to try polynomial regression.One of the polynomial regressions I tried was a one where with alcohol, sulphates, and pH level:
+
+```{r}
+
+quadratic.model <- lm(quality ~ poly(alcohol, 2, raw=TRUE) +
+                        poly(sulphates, 2, raw=TRUE) +
+                        pH, data = wine1)
+
+mtable(quadratic.model)
+
+```
+
+Once again, the results return a correlation coefficient ($r^{2}$) of 0.2.  
+
+##Decision Trees
+
+Since regressions did not show any meaningful relationships between wine characteristics and quality score, the last analysis I attempted to discover a relationship was to apply a decision tree model to the data set.  For this I used the install package 'rpart' and divide the dataset into 3 groups dependent on the quality score.  All wines with scores lower than 6 were classified as 'bad', wines with a quality of 6 were classified as 'average' and wines with quality scores above six were classified as 'good'
+
+Using the following code, I applied a decision tree classification model with 6 variables (alcohol, sulphates, pH level, free sulfur dioxide, residual sugar, density:
+
+```{r, echo=FALSE}
+# creating a new column with 3 values dependent on where the wine's score is on the range from 0-10
+
+wine1$quality.class <- 'average'
+wine1$quality.class <- ifelse(wine1$quality < 6, "bad", wine1$quality.class)
+wine1$quality.class <- ifelse(wine1$quality > 6, "good", wine1$quality.class)
+
+
+
+```
+
+
+```{r, fig.height = 8, fig.width = 10, warning = FALSE, message=FALSE}
+tree <-rpart(quality.class ~ alcohol + 
+               sulphates + 
+               pH + 
+               free.sulfur.dioxide +
+               residual.sugar + density, 
+             data = wine1, method = "class")
+
+printcp(tree)
+plot(tree)
+text(tree)
+
+```
+Using this decision tree, a wine's class can be correctly predicted 53.58% (2079/3880) of the time when choosing 3 options (bad, average, good).  Predicting 'average' everytime would result in a 46.42% success rate so the decision tree does increase our wine quality class predictive capabilities by 7.16%.  Such a small predictive increase coupled with a relatively low success rate suggests that the relationship between a wine's quality score and its characteristics is weak at best.
+
+Still, as the decision tree branch above shows, the model only used 3 variables (alcohol, free sulfur dioxide, and residual sugar) and threw out the other 3 further supporting the idea that wine characteristics do not significantly impact the quality score of the wine.
+
+
+#Conclusion
+
+Throughout this analysis, the quality scores for white wines have been directly compared with correlation coefficients to the each wine characteristics and combinations of those characteristics through linear and polynomial regression.  The white wine characteristics have also been used in a decision tree model to see if qualtiy could be predicted.  None of these methods yielded any results suggesting that a wine's quality score is impacted by its characteristics.
+
+In conclusion, it appears that juding the quality of white wine is mostly a subjective matter and is not impacted a wine's chemical characteristics.  While a data set with a larger sample size and more documented characteristics might reveal stronger correlations between a white wine's chemical properties and its quality score, the current dataset does not.  
+
+
+# Final Plots and Summary
+
+
+### Scatterplot Graph
+1. An improvement on the alcohol v. quality scatterplot.  A linear regression, quadratic regreesion, and a locally weighted regression line have been applied.  Jitter and alpha have been changed for the plot points.  The points are color coded based on which quality class they are in and a title has been added. 
+The regressions show the mild correlation between alcohol content and quality with their mostly postive diagonal slopes.  These take into account that the 'bad' wines are mostly under 11% alcohol while the good wines are mostly over 10%.  Still the near even distribution of 'average' wines reminds us that the correlation is still only mild.
+
+```{r, echo = FALSE, warning = FALSE}
+
+  ggplot(aes(x = quality, y = alcohol), data = wine1) +
+  geom_point(aes(color = quality.class), alpha = 0.5, size = 1, 
+             position = 'jitter') +
+  stat_smooth(method = 'lm', color = 'purple') +
+  stat_smooth(method = 'loess', color = 'black') +
+  stat_smooth(method = 'lm', formula = y ~ x + I(x^2), color = 'red') +
+  ggtitle('White Wine Quality Score Compared to Wine Alcohol Content') +
+   xlab("Quality Score (0-10)") +
+  ylab("Alcohol % in the wine")
+
+```
+
+### Jitter Scatterplot Graph
+2. An x-y graph with color coded points showing if a combination of chlorides and density values correlates to the wine quality score.  The points have been assigned to the quality class rather than score and have been given distinct primary colors in order to tell the difference.  As the graph shows, there seems to be more 'good' wines (green) with lower Density and Chloride values and more 'bad' (blue) wines with higher values however the even distribution of 'average' wines throughout the graph squash any idea that there is a strong or even moderate correlation between the intersection of Density/Chloride and a wine's quality.
+
+```{r, echo = FALSE}
+
+ggplot(aes(x = chlorides, y = density, color = as.factor(quality.class)), 
+       data = wine1) +
+  geom_jitter(alpha = 0.8) +
+  scale_color_brewer(type = 'seq', palette = "Set1", guide = 'legend') +
+  ggtitle("Combination of Chloride and Density impact on Wine Quality Score") +
+  ylab("Density mg/l") +
+  xlab("Chlorides mg/l")
+
+```
+
+
+###  Decision Tree
+3. Searching the web for ways to create a better visualization of the decision tree, I settled on using the packages 'rattle' and 'rpart.plot' to create the superior decision tree shown below.
+
+These packages include interesting information like how many wines fell into each final branch as a percentage.  For example, the decision tree has 4 potential outcomes where it predicts a wine is 'average' but two of those outcomes combine for only 5% of all outcomes while the other two combine for 48%.  Similarly there are two 'bad' outcomes but one is only 1% while the other is 35%.  As such the decision tree rarely concludes that a wine is 'good' (8%) which is another indicator that the tree is only barely more complicated in its decision making than a ZeroR algorithm (predicting the majority class every time).
+```{r, echo = FALSE,  fig.height = 10, fig.width = 10, warning = FALSE, message=FALSE}
+
+library(rattle)
+library(rpart.plot)
+library(RColorBrewer)
+
+fancyRpartPlot(tree, snip = TRUE,
+               main = 'Decision Tree for Quality Class Assignment', 
+               sub = 'Success Rate = 53.58%',
+               palettes = c("Greens", "Blues"))
+
+```
+
+
+##Reflection
+
+This data set proved frustrating as the desire to find some sort of meaning or objective relationship beween the characteristics of white wine and that wine's quality score proved inconclusive or near non-existant everytime with none of the methods learned throughout the course providing definitive answers.  Reaching out and using decision trees in this set was the only way for me to validate that the answers I was receiving from the regression models and correlating coefficients were accurate.  As such, besides the decision tree results, I'm unsure if I can call any of it a success especially as there are were missing characteristics about the wines that could have been useful in the dataset.  Such additions as where each wine was made and the types of grapes used I believe would greatly enhance the data.  Also a larger sample set than 4800 would be beneficial.  
